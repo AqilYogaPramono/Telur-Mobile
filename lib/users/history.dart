@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:telur_mobile/users/camera.dart';
 import 'package:telur_mobile/users/detail-anlysis.dart';
 import 'package:telur_mobile/users/home.dart';
 import 'package:telur_mobile/users/profile.dart';
@@ -87,9 +88,7 @@ class _HistoryPageState extends State<HistoryPage> {
     if (tab == AppTab.camera) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => const _PlaceholderPage(title: 'Kamera'),
-        ),
+        MaterialPageRoute(builder: (_) => const CameraPage()),
       );
     }
   }
@@ -519,9 +518,7 @@ class _PlaceholderPage extends StatelessWidget {
           if (tab == AppTab.camera) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(
-                builder: (_) => const _PlaceholderPage(title: 'Kamera'),
-              ),
+              MaterialPageRoute(builder: (_) => const CameraPage()),
             );
           }
         },
