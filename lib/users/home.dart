@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:telur_mobile/users/detail-anlysis.dart';
 import 'package:telur_mobile/widgets/navbutton.dart';
 import 'package:telur_mobile/widgets/skeleton.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
@@ -112,7 +113,9 @@ class _HomePageState extends State<HomePage> {
   void _toDetail(AnalysisRecord record) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => _DetailAnalysisPage(record: record)),
+      MaterialPageRoute(
+        builder: (_) => DetailAnalysisPage(analysisId: record.id),
+      ),
     );
   }
 
@@ -503,10 +506,10 @@ class _EmptyCard extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.subtitle});
+  const _SectionHeader({required this.title, this.subtitle});
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -521,15 +524,17 @@ class _SectionHeader extends StatelessWidget {
             color: Color(0xFF2F4A2B),
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF6B7565),
-            fontWeight: FontWeight.w500,
+        if (subtitle != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle!,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF6B7565),
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -618,38 +623,6 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-class _DetailAnalysisPage extends StatelessWidget {
-  const _DetailAnalysisPage({required this.record});
-
-  final AnalysisRecord record;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const TopBar(title: 'Detail Analisis'),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(record.imageUrl, fit: BoxFit.cover),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _StatChipsRow(record: record),
-          const SizedBox(height: 12),
-          _MetaRow(
-            label: 'Tanggal & Waktu',
-            value: formatDateTimeId(record.detectedAt),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PlaceholderPage extends StatelessWidget {
   const _PlaceholderPage({required this.title});
 
@@ -708,6 +681,7 @@ class _PlaceholderPage extends StatelessWidget {
 
 class AnalysisRecord {
   const AnalysisRecord({
+    required this.id,
     required this.imageDriveId,
     required this.eggCount,
     required this.fertileCount,
@@ -718,6 +692,7 @@ class AnalysisRecord {
 
   factory AnalysisRecord.fromJson(Map<String, dynamic> json) {
     return AnalysisRecord(
+      id: (json['id'] as num?)?.toInt() ?? 0,
       imageDriveId: json['images_detection']?.toString() ?? '',
       eggCount: (json['egg_count'] as num?)?.toInt() ?? 0,
       fertileCount: (json['fertile_count'] as num?)?.toInt() ?? 0,
@@ -728,6 +703,7 @@ class AnalysisRecord {
     );
   }
 
+  final int id;
   final String imageDriveId;
   final int eggCount;
   final int fertileCount;
