@@ -26,18 +26,23 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-          child: InkWell(
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              customBorder: const CircleBorder(),
             onTap: onProfileTap,
-            borderRadius: BorderRadius.circular(30),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFE9F1E3),
-                border: Border.all(color: const Color(0xFFB8C9A8)),
+              child: Ink(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFE9F1E3),
+                  border: Border.all(color: const Color(0xFFB8C9A8)),
+                ),
+                child: const Icon(Icons.person_rounded, size: 20),
               ),
-              child: const Icon(Icons.person_rounded, size: 20),
             ),
           ),
         ),

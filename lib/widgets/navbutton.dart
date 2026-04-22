@@ -82,7 +82,7 @@ class NavButton extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.add, color: Colors.white, size: 28),
+              child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 24),
             ),
           ),
         ],
