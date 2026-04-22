@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:telur_mobile/users/detail-anlysis.dart';
 import 'package:telur_mobile/users/history.dart';
+import 'package:telur_mobile/users/profile.dart';
 import 'package:telur_mobile/widgets/navbutton.dart';
 import 'package:telur_mobile/widgets/skeleton.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
@@ -130,7 +131,7 @@ class _HomePageState extends State<HomePage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => const _PlaceholderPage(title: 'Profil'),
+              builder: (_) => const ProfilePage(),
             ),
           );
         },
@@ -632,7 +633,15 @@ class _PlaceholderPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: TopBar(title: title),
+      appBar: TopBar(
+        title: title,
+        onProfileTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProfilePage()),
+          );
+        },
+      ),
       body: Center(
         child: Text(
           '$title page belum dipindah',

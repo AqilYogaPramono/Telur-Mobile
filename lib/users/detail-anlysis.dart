@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:telur_mobile/users/profile.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
 
 String _formatDateTimeId(DateTime value) {
@@ -91,7 +92,15 @@ class _DetailAnalysisPageState extends State<DetailAnalysisPage> {
   Widget build(BuildContext context) {
     final detail = _detail;
     return Scaffold(
-      appBar: const TopBar(title: 'Detail Analisis'),
+      appBar: TopBar(
+        title: 'Detail Analisis',
+        onProfileTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProfilePage()),
+          );
+        },
+      ),
       body: RefreshIndicator(
         onRefresh: _loadDetail,
         child: ListView(
