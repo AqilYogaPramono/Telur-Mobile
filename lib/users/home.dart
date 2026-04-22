@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:telur_mobile/users/detail-anlysis.dart';
+import 'package:telur_mobile/users/history.dart';
 import 'package:telur_mobile/widgets/navbutton.dart';
 import 'package:telur_mobile/widgets/skeleton.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
@@ -103,7 +104,7 @@ class _HomePageState extends State<HomePage> {
   void _onTabChanged(AppTab tab) {
     if (tab == AppTab.home) return;
     final page = switch (tab) {
-      AppTab.history => const _PlaceholderPage(title: 'Riwayat'),
+      AppTab.history => const HistoryPage(),
       AppTab.camera => const _PlaceholderPage(title: 'Kamera'),
       _ => const HomePage(),
     };
@@ -668,9 +669,7 @@ class _PlaceholderPage extends StatelessWidget {
           if (tab == AppTab.history) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(
-                builder: (_) => const _PlaceholderPage(title: 'Riwayat'),
-              ),
+              MaterialPageRoute(builder: (_) => const HistoryPage()),
             );
           }
         },
