@@ -10,6 +10,10 @@ import 'package:telur_mobile/users/profile.dart';
 import 'package:telur_mobile/widgets/navbutton.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
 
+const Map<String, String> _ngrokHeaders = {
+  'ngrok-skip-browser-warning': 'true',
+};
+
 String _formatDateTimeId(DateTime value) {
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
   const months = [
@@ -73,7 +77,8 @@ class _CameraPageState extends State<CameraPage> {
     final deadline = DateTime.now().add(const Duration(minutes: 5));
 
     while (DateTime.now().isBefore(deadline)) {
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response =
+          await http.get(uri, headers: _ngrokHeaders).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
         throw Exception('Gagal cek status analisis: ${response.statusCode}');
       }
@@ -99,7 +104,8 @@ class _CameraPageState extends State<CameraPage> {
   Future<int> _triggerEsp32ManualAnalyze(String esp32Url) async {
     final normalized = esp32Url.endsWith('/') ? esp32Url.substring(0, esp32Url.length - 1) : esp32Url;
     final uri = Uri.parse('$normalized/manual-analyze');
-    final response = await http.post(uri).timeout(const Duration(seconds: 20));
+    final response =
+        await http.post(uri, headers: _ngrokHeaders).timeout(const Duration(seconds: 20));
     if (response.statusCode != 200) {
       throw Exception('ESP32 manual-analyze gagal: ${response.statusCode}');
     }
@@ -136,7 +142,7 @@ class _CameraPageState extends State<CameraPage> {
         .replaceFirst(RegExp(r'/egg-analysis$', caseSensitive: false), '');
     final detailUri = Uri.parse('$base/egg-analysis/$idEggDetections');
 
-    final response = await http.get(detailUri);
+    final response = await http.get(detailUri, headers: _ngrokHeaders);
     if (response.statusCode != 200) {
       throw Exception('Gagal ambil data analisis: ${response.statusCode}');
     }

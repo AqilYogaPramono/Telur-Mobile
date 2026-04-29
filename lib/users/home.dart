@@ -11,6 +11,10 @@ import 'package:telur_mobile/widgets/navbutton.dart';
 import 'package:telur_mobile/widgets/skeleton.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
 
+const Map<String, String> _ngrokHeaders = {
+  'ngrok-skip-browser-warning': 'true',
+};
+
 String formatDateTimeId(DateTime value) {
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
   const months = [
@@ -72,7 +76,10 @@ class _HomePageState extends State<HomePage> {
           : '$normalized/egg-analysis-news';
       final latestUri = Uri.parse(latestEndpoint);
       final historyUri = Uri.parse('$latestEndpoint/history');
-      final responses = await Future.wait([http.get(latestUri), http.get(historyUri)]);
+      final responses = await Future.wait([
+        http.get(latestUri, headers: _ngrokHeaders),
+        http.get(historyUri, headers: _ngrokHeaders),
+      ]);
       AnalysisRecord? latest;
       final latestStatusCode = responses[0].statusCode;
       if (latestStatusCode == 200) {
