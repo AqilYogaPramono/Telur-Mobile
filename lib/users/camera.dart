@@ -41,58 +41,158 @@ class CameraPage extends StatefulWidget {
 }
 
 class _CameraPageState extends State<CameraPage> {
-  // Disiapkan untuk integrasi alur kamera berikutnya.
   static int idEggDetections = 1;
   static CameraResultData? _cachedData;
+  static Future<CameraResultData>? _ongoingAnalysis;
+  static String? _cachedErrorMessage;
 
   bool _isLoading = false;
-  String? _errorMessage;
+  String? _errorMessage = _cachedErrorMessage;
   CameraResultData? _data = _cachedData;
 
-  Future<void> _ambilFoto() async {
-    setState(() {
+  @override
+  void initState() {
+    super.initState();
+    if (_ongoingAnalysis != null) {
       _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      await dotenv.load(fileName: '.env');
-      final apiValue = (dotenv.env['API'] ?? '').trim();
-      if (apiValue.isEmpty) {
-        throw Exception('API pada .env belum diisi');
-      }
+      _attachToOngoingAnalysis();
+    }
+  }
 
-      final normalized = apiValue.endsWith('/')
-          ? apiValue.substring(0, apiValue.length - 1)
-          : apiValue;
-      final base = normalized
-          .replaceFirst(RegExp(r'/egg-analysis-news$', caseSensitive: false), '')
-          .replaceFirst(RegExp(r'/egg-analysis$', caseSensitive: false), '');
-      final detailUri = Uri.parse('$base/egg-analysis/$idEggDetections');
+  Future<int> _waitForBackendAnalyzeResultId({
+    required String apiValue,
+    required int jobId,
+  }) async {
+    final normalized =
+        apiValue.endsWith('/') ? apiValue.substring(0, apiValue.length - 1) : apiValue;
+    final base = normalized
+        .replaceFirst(RegExp(r'/egg-analysis-news$', caseSensitive: false), '')
+        .replaceFirst(RegExp(r'/egg-analysis$', caseSensitive: false), '');
 
-      final response = await http.get(detailUri);
+    final uri = Uri.parse('$base/analyze-egg/jobs/$jobId');
+    final deadline = DateTime.now().add(const Duration(minutes: 5));
+
+    while (DateTime.now().isBefore(deadline)) {
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
-        throw Exception('Gagal ambil data analisis: ${response.statusCode}');
+        throw Exception('Gagal cek status analisis: ${response.statusCode}');
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final parsed = CameraResultData.fromJson(json);
-      _cachedData = parsed;
+      final status = (json['status'] as String?)?.toLowerCase();
+      final resultId = (json['result_id'] as num?)?.toInt();
+      final error = json['error']?.toString();
 
+      if (status == 'succeeded' && resultId != null && resultId > 0) {
+        return resultId;
+      }
+      if (status == 'failed') {
+        throw Exception('Analisis gagal: ${error ?? response.body}');
+      }
+
+      await Future.delayed(const Duration(seconds: 2));
+    }
+
+    throw Exception('Timeout menunggu hasil analisis.');
+  }
+
+  Future<int> _triggerEsp32ManualAnalyze(String esp32Url) async {
+    final normalized = esp32Url.endsWith('/') ? esp32Url.substring(0, esp32Url.length - 1) : esp32Url;
+    final uri = Uri.parse('$normalized/manual-analyze');
+    final response = await http.post(uri).timeout(const Duration(seconds: 20));
+    if (response.statusCode != 200) {
+      throw Exception('ESP32 manual-analyze gagal: ${response.statusCode}');
+    }
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final ok = json['ok'] == true;
+    final jobId = ((json['job_id'] as num?) ?? (json['id'] as num?))?.toInt();
+    if (!ok || jobId == null || jobId <= 0) {
+      throw Exception('Response ESP32 tidak valid: ${response.body}');
+    }
+    return jobId;
+  }
+
+  Future<CameraResultData> _runAnalysisFlow() async {
+    await dotenv.load(fileName: '.env');
+    final apiValue = (dotenv.env['API'] ?? '').trim();
+    if (apiValue.isEmpty) {
+      throw Exception('API pada .env belum diisi');
+    }
+
+    final esp32Value = (dotenv.env['ESP32_URL'] ?? '').trim();
+    if (esp32Value.isEmpty) {
+      throw Exception('ESP32_URL pada .env belum diisi');
+    }
+
+    final jobId = await _triggerEsp32ManualAnalyze(esp32Value);
+    final resultId = await _waitForBackendAnalyzeResultId(apiValue: apiValue, jobId: jobId);
+    idEggDetections = resultId;
+
+    final normalized = apiValue.endsWith('/')
+        ? apiValue.substring(0, apiValue.length - 1)
+        : apiValue;
+    final base = normalized
+        .replaceFirst(RegExp(r'/egg-analysis-news$', caseSensitive: false), '')
+        .replaceFirst(RegExp(r'/egg-analysis$', caseSensitive: false), '');
+    final detailUri = Uri.parse('$base/egg-analysis/$idEggDetections');
+
+    final response = await http.get(detailUri);
+    if (response.statusCode != 200) {
+      throw Exception('Gagal ambil data analisis: ${response.statusCode}');
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return CameraResultData.fromJson(json);
+  }
+
+  void _attachToOngoingAnalysis() {
+    final future = _ongoingAnalysis;
+    if (future == null) return;
+
+    future.then((parsed) {
+      _cachedData = parsed;
+      _cachedErrorMessage = null;
       if (!mounted) return;
       setState(() {
         _data = parsed;
+        _errorMessage = null;
       });
-    } catch (e) {
+    }).catchError((error) {
+      _cachedErrorMessage = error.toString();
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = _cachedErrorMessage;
       });
-    } finally {
+    }).whenComplete(() {
+      if (identical(_ongoingAnalysis, future)) {
+        _ongoingAnalysis = null;
+      }
       if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
+    });
+  }
+
+  Future<void> _ambilFoto() async {
+    if (_ongoingAnalysis != null) {
+      if (mounted && !_isLoading) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
+      _attachToOngoingAnalysis();
+      return;
     }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    _cachedErrorMessage = null;
+
+    _ongoingAnalysis = _runAnalysisFlow();
+    _attachToOngoingAnalysis();
   }
 
   void _ambilFotoLainnya() {
@@ -101,6 +201,7 @@ class _CameraPageState extends State<CameraPage> {
       _errorMessage = null;
     });
     _cachedData = null;
+    _cachedErrorMessage = null;
   }
 
   void _onTabChanged(AppTab tab) {
