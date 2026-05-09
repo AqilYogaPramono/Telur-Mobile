@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -51,6 +52,9 @@ class _CameraPageState extends State<CameraPage> {
   static String? _cachedErrorMessage;
 
   bool _isLoading = false;
+  double _progressValue = 0.0;
+  bool _canRetake = false;
+  Timer? _retakeTimer;
   String? _errorMessage = _cachedErrorMessage;
   CameraResultData? _data = _cachedData;
 
@@ -61,6 +65,26 @@ class _CameraPageState extends State<CameraPage> {
       _isLoading = true;
       _attachToOngoingAnalysis();
     }
+    if (_data != null) {
+      _scheduleRetakeEnable();
+    }
+  }
+
+  @override
+  void dispose() {
+    _retakeTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleRetakeEnable() {
+    _retakeTimer?.cancel();
+    _canRetake = false;
+    _retakeTimer = Timer(const Duration(minutes: 1), () {
+      if (!mounted) return;
+      setState(() {
+        _canRetake = true;
+      });
+    });
   }
 
   Future<int> _waitForBackendAnalyzeResultId({
@@ -74,9 +98,18 @@ class _CameraPageState extends State<CameraPage> {
         .replaceFirst(RegExp(r'/egg-analysis$', caseSensitive: false), '');
 
     final uri = Uri.parse('$base/analyze-egg/jobs/$jobId');
-    final deadline = DateTime.now().add(const Duration(minutes: 5));
+    final deadline = DateTime.now().add(const Duration(minutes: 1));
+    const pollInterval = Duration(seconds: 2);
+    final totalPolls =
+        (deadline.difference(DateTime.now()).inMilliseconds / pollInterval.inMilliseconds)
+            .ceil()
+            .clamp(1, 10_000);
+    var pollCount = 0;
+    var sawRunning = false;
 
     while (DateTime.now().isBefore(deadline)) {
+      pollCount++;
+
       final response =
           await http.get(uri, headers: _ngrokHeaders).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
@@ -88,14 +121,34 @@ class _CameraPageState extends State<CameraPage> {
       final resultId = (json['result_id'] as num?)?.toInt();
       final error = json['error']?.toString();
 
+      if (status == 'running') {
+        sawRunning = true;
+      }
+
+      if (mounted) {
+        final pollRatio = (pollCount / totalPolls).clamp(0.0, 1.0);
+        final base = sawRunning ? 0.30 : 0.20;
+        final progress = (base + (pollRatio * 0.65)).clamp(0.0, 0.95);
+        if (progress > _progressValue) {
+          setState(() {
+            _progressValue = progress;
+          });
+        }
+      }
+
       if (status == 'succeeded' && resultId != null && resultId > 0) {
+        if (mounted) {
+          setState(() {
+            _progressValue = 1.0;
+          });
+        }
         return resultId;
       }
       if (status == 'failed') {
         throw Exception('Analisis gagal: ${error ?? response.body}');
       }
 
-      await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(pollInterval);
     }
 
     throw Exception('Timeout menunggu hasil analisis.');
@@ -105,7 +158,7 @@ class _CameraPageState extends State<CameraPage> {
     final normalized = esp32Url.endsWith('/') ? esp32Url.substring(0, esp32Url.length - 1) : esp32Url;
     final uri = Uri.parse('$normalized/manual-analyze');
     final response =
-        await http.post(uri, headers: _ngrokHeaders).timeout(const Duration(seconds: 20));
+        await http.post(uri, headers: _ngrokHeaders).timeout(const Duration(minutes: 2));
     if (response.statusCode != 200) {
       throw Exception('ESP32 manual-analyze gagal: ${response.statusCode}');
     }
@@ -130,7 +183,18 @@ class _CameraPageState extends State<CameraPage> {
       throw Exception('ESP32_URL pada .env belum diisi');
     }
 
+    if (mounted) {
+      setState(() {
+        _progressValue = 0.05;
+      });
+    }
+
     final jobId = await _triggerEsp32ManualAnalyze(esp32Value);
+    if (mounted) {
+      setState(() {
+        _progressValue = 0.20;
+      });
+    }
     final resultId = await _waitForBackendAnalyzeResultId(apiValue: apiValue, jobId: jobId);
     idEggDetections = resultId;
 
@@ -162,7 +226,9 @@ class _CameraPageState extends State<CameraPage> {
       setState(() {
         _data = parsed;
         _errorMessage = null;
+        _progressValue = 1.0;
       });
+      _scheduleRetakeEnable();
     }).catchError((error) {
       _cachedErrorMessage = error.toString();
       if (!mounted) return;
@@ -193,6 +259,7 @@ class _CameraPageState extends State<CameraPage> {
 
     setState(() {
       _isLoading = true;
+      _progressValue = 0.0;
       _errorMessage = null;
     });
     _cachedErrorMessage = null;
@@ -202,9 +269,12 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   void _ambilFotoLainnya() {
+    _retakeTimer?.cancel();
     setState(() {
       _data = null;
       _errorMessage = null;
+      _canRetake = false;
+      _progressValue = 0.0;
     });
     _cachedData = null;
     _cachedErrorMessage = null;
@@ -242,6 +312,7 @@ class _CameraPageState extends State<CameraPage> {
               _CameraResultCard(
                 data: data,
                 isLoading: _isLoading,
+                progressValue: _progressValue,
                 onPrimaryAction: () {
                   if (data == null) {
                     _ambilFoto();
@@ -281,7 +352,7 @@ class _CameraPageState extends State<CameraPage> {
                 SizedBox(
                   width: 190,
                   child: OutlinedButton(
-                    onPressed: _ambilFotoLainnya,
+                    onPressed: _canRetake ? _ambilFotoLainnya : null,
                     child: const Text('Ambil Foto Lainnya'),
                   ),
                 ),
@@ -302,12 +373,14 @@ class _CameraResultCard extends StatelessWidget {
   const _CameraResultCard({
     required this.data,
     required this.isLoading,
+    required this.progressValue,
     required this.onPrimaryAction,
     required this.onTapImage,
   });
 
   final CameraResultData? data;
   final bool isLoading;
+  final double progressValue;
   final VoidCallback onPrimaryAction;
   final VoidCallback? onTapImage;
 
@@ -376,10 +449,32 @@ class _CameraResultCard extends StatelessWidget {
 
   Widget _buildImageContent() {
     if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Colors.white,
-          strokeWidth: 2.6,
+      final pct = (progressValue.clamp(0.0, 1.0) * 100).round();
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 220,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progressValue <= 0 ? null : progressValue.clamp(0.0, 1.0),
+                  minHeight: 10,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '${pct.clamp(1, 100)}%',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       );
     }
