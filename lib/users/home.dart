@@ -11,6 +11,10 @@ import 'package:telur_mobile/widgets/navbutton.dart';
 import 'package:telur_mobile/widgets/skeleton.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
 
+const Map<String, String> _ngrokHeaders = {
+  'ngrok-skip-browser-warning': 'true',
+};
+
 String formatDateTimeId(DateTime value) {
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
   const months = [
@@ -72,16 +76,22 @@ class _HomePageState extends State<HomePage> {
           : '$normalized/egg-analysis-news';
       final latestUri = Uri.parse(latestEndpoint);
       final historyUri = Uri.parse('$latestEndpoint/history');
-      final responses = await Future.wait([http.get(latestUri), http.get(historyUri)]);
-      if (responses[0].statusCode != 200) {
-        throw Exception('Gagal ambil data terbaru: ${responses[0].statusCode}');
+      final responses = await Future.wait([
+        http.get(latestUri, headers: _ngrokHeaders),
+        http.get(historyUri, headers: _ngrokHeaders),
+      ]);
+      AnalysisRecord? latest;
+      final latestStatusCode = responses[0].statusCode;
+      if (latestStatusCode == 200) {
+        final latestJson = jsonDecode(responses[0].body) as Map<String, dynamic>;
+        latest = AnalysisRecord.fromJson(latestJson);
+      } else if (latestStatusCode != 404) {
+        throw Exception('Gagal ambil data terbaru: $latestStatusCode');
       }
       if (responses[1].statusCode != 200) {
         throw Exception('Gagal ambil data riwayat: ${responses[1].statusCode}');
       }
-      final latestJson = jsonDecode(responses[0].body) as Map<String, dynamic>;
       final historyJson = jsonDecode(responses[1].body) as List<dynamic>;
-      final latest = AnalysisRecord.fromJson(latestJson);
       final history = historyJson
           .map((e) => AnalysisRecord.fromJson(e as Map<String, dynamic>))
           .toList()
@@ -164,7 +174,7 @@ class _HomePageState extends State<HomePage> {
                 onTapDetail: () => _toDetail(latest),
               )
             else
-              const _EmptyCard(text: 'Belum ada data analisis terbaru'),
+              const _LatestEmptyCard(),
             const SizedBox(height: 18),
             const _SectionHeader(
               title: 'Riwayat 3 Hari Terakhir',
@@ -289,6 +299,51 @@ class _LatestCard extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: onTapDetail,
                 child: const Text('Lihat Detail'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LatestEmptyCard extends StatelessWidget {
+  const _LatestEmptyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 1.5,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: const AspectRatio(
+                aspectRatio: 16 / 9,
+                child: ColoredBox(
+                  color: Color(0xFFF2EFE3),
+                  child: Center(
+                    child: Icon(
+                      Icons.photo_camera_back_outlined,
+                      color: Color(0xFF6B7565),
+                      size: 46,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Belum ada analisis telur hari ini.',
+              style: TextStyle(
+                color: Color(0xFF6B7565),
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],

@@ -6,6 +6,10 @@ import 'package:http/http.dart' as http;
 import 'package:telur_mobile/users/profile.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
 
+const Map<String, String> _ngrokHeaders = {
+  'ngrok-skip-browser-warning': 'true',
+};
+
 String _formatDateTimeId(DateTime value) {
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
   const months = [
@@ -67,7 +71,7 @@ class _DetailAnalysisPageState extends State<DetailAnalysisPage> {
           ? normalized.replaceFirst('/egg-analysis-news', '')
           : normalized;
       final detailUri = Uri.parse('$base/egg-analysis/${widget.analysisId}');
-      final response = await http.get(detailUri);
+      final response = await http.get(detailUri, headers: _ngrokHeaders);
       if (response.statusCode != 200) {
         throw Exception('Gagal ambil detail analisis: ${response.statusCode}');
       }

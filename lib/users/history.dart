@@ -11,6 +11,10 @@ import 'package:telur_mobile/widgets/navbutton.dart';
 import 'package:telur_mobile/widgets/skeleton.dart';
 import 'package:telur_mobile/widgets/topbar.dart';
 
+const Map<String, String> _ngrokHeaders = {
+  'ngrok-skip-browser-warning': 'true',
+};
+
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -49,7 +53,7 @@ class _HistoryPageState extends State<HistoryPage> {
           .replaceFirst(RegExp(r'/egg-analysis$', caseSensitive: false), '');
       final historyUri = Uri.parse('$base/egg-analysis');
 
-      final response = await http.get(historyUri);
+      final response = await http.get(historyUri, headers: _ngrokHeaders);
       if (response.statusCode != 200) {
         throw Exception('Gagal ambil data riwayat: ${response.statusCode}');
       }
